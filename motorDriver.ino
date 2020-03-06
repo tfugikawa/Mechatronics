@@ -12,7 +12,9 @@ const int PWMB = 9;
 
 float distance[2];
 float ref;
-int factor = 200;
+
+const int nominal = 100;
+const int factor = 40;
 
 void setup(){
   pinMode(prox1,INPUT); 
@@ -40,26 +42,32 @@ void setup(){
 void loop(){
   //Initialize reference
   if (digitalRead(switchPin) == HIGH){
-    getDistance();
-    ref = distance[0];
-    
     analogWrite(PWMA,0);
     analogWrite(PWMB,0);
+    getDistance();
+    ref = distance[0];
   }
   else{
     getDistance(); // Sensor 0 is on the left side of the vehicle
     
-    float diff = distance[0]-ref;
-    //B faster if diff>0
+    float diff = ref-distance[0];
+    //motor B faster if diff>0
     
-    int spA = min(max(127-factor*diff,0),255);
-    int spB = min(max(127+factor*diff,0),255);
+    int spA = min(max(nominal-factor*diff,50),255);
+    int spB = min(max(nominal+factor*diff,50),255);
     
     Serial.print("A: ");
     Serial.print(spA);
     Serial.print("   B: ");
     Serial.println(spB);
-    //Serial.println((6762/((distance[0]*1024/5)-9))-4);
+
+    Serial.print("Ref: ");
+    Serial.print(ref);
+    Serial.print("   DistLeft: ");
+    Serial.println(distance[0]);
+//    Serial.print("   DistRight: ");
+//    Serial.println(distance[1]);
+    Serial.println();
     
     analogWrite(PWMA,spA);
     analogWrite(PWMB,spB);
@@ -74,20 +82,17 @@ void loop(){
 
 void getDistance(){
   int numSamples = 5;
-  float totDist[2] = {
-    0,0  }; 
-  float dist[2] = {
-    0,0  };
+  float totDist[2] = {0,0};
+  
   for(int i = 0;i<numSamples;i++){
-    dist[0] = analogRead(prox1);
-    dist[0] = dist[0]*5/1024;
-    dist[1] = analogRead(prox2);
-    dist[1] = dist[1]*5/1024;
-    totDist[0] = dist[0] + totDist[0];
-    totDist[1] = dist[1] + totDist[1];
+    totDist[0] += analogRead(prox1);
+    totDist[1] += analogRead(prox2);
     delay(40);
   }
-  distance[0] = totDist[0]/numSamples;
-  distance[1] = totDist[1]/numSamples;
+  distance[0] = convertDist(totDist[0]/numSamples);
+  distance[1] = convertDist(totDist[1]/numSamples);
 }
 
+float convertDist(float x){
+  return ((6792/(x-9)) - 4);
+}
